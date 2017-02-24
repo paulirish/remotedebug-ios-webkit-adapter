@@ -25,6 +25,7 @@ export abstract class IOSProtocol extends ProtocolAdapter {
     public static SEPARATOR: string = ': ';
 
     protected _styleMap: Map<string, any>;
+    protected _executionContexts: Array<any>;
     protected _isEvaluating: boolean;
     protected _lastScriptEval: string;
     protected _lastNodeId: number;
@@ -34,8 +35,10 @@ export abstract class IOSProtocol extends ProtocolAdapter {
         super(target);
 
         this._styleMap = new Map<string, any>();
+        this._executionContexts = [];
 
         this._target.on('tools::DOM.getDocument', () => this.onDomGetDocument());
+        this._target.on('target::Page.frameNavigated', () => this.onframeNavigated());
 
         this._target.addMessageFilter('tools::CSS.setStyleTexts', (msg) => this.onSetStyleTexts(msg));
         this._target.addMessageFilter('tools::CSS.getMatchedStylesForNode', (msg) => this.onGetMatchedStylesForNode(msg));
@@ -91,6 +94,11 @@ export abstract class IOSProtocol extends ProtocolAdapter {
     private onDomGetDocument(): void {
         // Rundown the stylesheets when the page navigates
         this.enumerateStyleSheets();
+    }
+
+    private onframeNavigated(): void {
+        console.log('HISDFHIH EVERYONE FRAME NAVIGATE')
+        this.clearExecutionContexts();
     }
 
     private onSetStyleTexts(msg: any): Promise<any> {
@@ -246,14 +254,21 @@ export abstract class IOSProtocol extends ProtocolAdapter {
 
     private onExecutionContextCreated(msg: any): Promise<any> {
         if (msg.params && msg.params.context) {
-            if (!msg.params.context.origin) {
-                msg.params.context.origin = msg.params.context.name;
+            const context = msg.params.context;
+            this._executionContexts.push(context);
+            if (!context.origin) {
+                context.origin = context.name;
             }
         }
         return Promise.resolve(msg);
     }
 
     private onEvaluate(msg: any): Promise<any> {
+         if (msg.error) {
+            Logger.error('iOS returned an unexpected value for Runtime.evaluate');
+            Logger.error(msg.error);
+            return Promise.resolve(null);
+        }
         if (msg.result.wasThrown) {
             msg.result.result.subtype = 'error';
             msg.result.exceptionDetails = {
@@ -513,6 +528,15 @@ export abstract class IOSProtocol extends ProtocolAdapter {
         };
         this._target.fireResultToTools(msg.id, result);
         return Promise.resolve(null);
+    }
+
+    protected clearExecutionContexts(): void {
+        this._executionContexts.forEach(context => {
+            console.log('Runtime.executionContextDestroyed', context.id)
+            this._target.fireEventToTools('Runtime.executionContextDestroyed', {executionContextId: context.id});
+        });
+        this._target.fireEventToTools('Runtime.executionContextsCleared', {});
+        this._executionContexts = [];
     }
 
     protected enumerateStyleSheets(): void {

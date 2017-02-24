@@ -1,3 +1,7 @@
 {
-  "typescript.check.workspaceVersion": false
+  "typescript.check.workspaceVersion": false,
+
+  "files.exclude": {
+    "out/**": true
+  }
 }

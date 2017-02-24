@@ -97,6 +97,10 @@ export class IOSAdapter extends AdapterCollection {
 
     public connectTo(url: string, wsFrom: WebSocket): Target {
         const target = super.connectTo(url, wsFrom);
+        if (!target) {
+            Logger.error(`Failed to connect to target: ${url}`);
+            return;
+        }
         if (!this._protocolMap.has(target)) {
             const version = (target.data.metadata as IIOSDeviceTarget).version;
             const protocol = this.getProtocolFor(version, target);
@@ -162,7 +166,7 @@ export class IOSAdapter extends AdapterCollection {
             }
 
         } else if (os.platform() === 'darwin') {
-            return '/usr/local/bin/ios_webkit_debug_proxy';
+            return '/Users/paulirish/.homebrew/bin/ios_webkit_debug_proxy';
         } else if (os.platform() === 'linux') {
             return '/usr/bin/ios_webkit_debug_proxy';
         }
